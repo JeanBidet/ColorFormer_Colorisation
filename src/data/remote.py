@@ -39,7 +39,12 @@ class StreamingHFDataset(IterableDataset):
                     if image.mode != 'RGB':
                         image = image.convert('RGB')
                         
-                    yield self.preprocessor(image)
+                    # Extract ID
+                    img_id = sample.get('file_name') or sample.get('filename') or sample.get('id') or str(hash(image.tobytes()))
+                        
+                    data = self.preprocessor(image)
+                    data['id'] = img_id
+                    yield data
                     
                 except Exception as e:
                     # print(f"Error processing HF sample: {e}")

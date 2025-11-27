@@ -7,28 +7,6 @@ import io
 from PIL import Image
 import os
 
-def create_dummy_tar(tar_path, num_images=10):
-    """
-    Creates a dummy .tar file with random images for testing.
-    """
-    print(f"Creating dummy tar file at {tar_path} with {num_images} images...")
-    with tarfile.open(tar_path, 'w') as tar:
-        for i in range(num_images):
-            # Generate random image
-            img = Image.fromarray(np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8))
-            
-            # Save to bytes
-            img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='JPEG')
-            img_byte_arr = img_byte_arr.getvalue()
-            
-            # Create tar info
-            info = tarfile.TarInfo(name=f"image_{i}.jpg")
-            info.size = len(img_byte_arr)
-            
-            # Add to tar
-            tar.addfile(tarinfo=info, fileobj=io.BytesIO(img_byte_arr))
-    print("Dummy tar created.")
 
 def visualize_batch(dataloader, output_filename="visualization_output.png"):
     """

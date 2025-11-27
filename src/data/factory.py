@@ -4,26 +4,30 @@ from .local import TarDataset
 from .remote import StreamingHFDataset
 from configs.config import HF_IMAGENET_ID, HF_PLACES365_ID
 
-def get_dataloader(source, tar_path=None, hf_token=None, batch_size=32, num_workers=4, image_size=(256, 256)):
+def get_dataloader(source, split='train', tar_path=None, hf_token=None, batch_size=32, num_workers=4, image_size=(256, 256)):
     """
     Factory for DataLoaders.
     
     Args:
         source (str): 'local_movienet', 'hf_imagenet', 'hf_places365'
+        split (str): 'train' or 'val'
         tar_path (str): Path for local tar.
         hf_token (str): Token for gated HF datasets.
     """
     preprocessor = CinematicPreprocessor(image_size=image_size)
     
+    # Map 'val' to 'validation' for HF if needed, or handle in factory
+    hf_split = 'validation' if split == 'val' else split
+    
     if source == 'local_movienet':
         if not tar_path:
             raise ValueError("tar_path is required for local_movienet")
-        dataset = TarDataset(tar_path, preprocessor)
+        dataset = TarDataset(tar_path, preprocessor, split=split)
         
     elif source == 'hf_imagenet':
         dataset = StreamingHFDataset(
             dataset_name=HF_IMAGENET_ID, 
-            split="train", 
+            split=hf_split, 
             preprocessor=preprocessor, 
             auth_token=hf_token
         )
@@ -31,7 +35,7 @@ def get_dataloader(source, tar_path=None, hf_token=None, batch_size=32, num_work
     elif source == 'hf_places365':
         dataset = StreamingHFDataset(
             dataset_name=HF_PLACES365_ID, 
-            split="train", 
+            split=hf_split, 
             preprocessor=preprocessor, 
             auth_token=hf_token
         )
