@@ -54,15 +54,6 @@ cinematic-colorizer/
     - [x] Hugging Face Streaming (ImageNet, Places365).
     - [x] Kornia Preprocessing (RGB -> Lab, Normalization).
     - [x] Modular Refactoring.
-- [ ] **Sprint 2: ColorFormer Model Architecture**
-    - [ ] Implement Generator (Transformer/CNN hybrid).
-    - [ ] Implement Discriminator.
-- [ ] **Sprint 3: Training Loop**
-    - [ ] GAN Loss functions.
-    - [ ] Mixed Precision Training.
-- [ ] **Sprint 4: Inference & UI**
-    - [ ] Video processing pipeline.
-    - [ ] Streamlit/Gradio Demo.
 
 ## Usage
 

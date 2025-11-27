@@ -20,3 +20,6 @@ dataset/*
 *.pth
 *.ckpt
 *.pt
+
+# Tests
+*test_vizualisation/*
