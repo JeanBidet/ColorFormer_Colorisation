@@ -8,14 +8,16 @@ class TarDataset(IterableDataset):
     """
     Streams images from a local .tar archive.
     """
-    def __init__(self, tar_path, preprocessor, split='train'):
+    def __init__(self, tar_path, preprocessor, split='train', limit=None):
         super(TarDataset, self).__init__()
         self.tar_path = tar_path
         self.preprocessor = preprocessor
         self.split = split
+        self.limit = limit
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
+        count = 0
         try:
             with tarfile.open(self.tar_path, 'r|*') as tar:
                 for i, member in enumerate(tar):
@@ -46,8 +48,13 @@ class TarDataset(IterableDataset):
                         
                         image = Image.open(io.BytesIO(f.read()))
                         data = self.preprocessor(image)
+                        data = self.preprocessor(image)
                         data['id'] = member.name
                         yield data
+                        
+                        count += 1
+                        if self.limit is not None and count >= self.limit:
+                            return
                         
                     except Exception as e:
                         # print(f"Error loading {member.name}: {e}")

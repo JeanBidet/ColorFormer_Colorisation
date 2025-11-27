@@ -6,15 +6,17 @@ class StreamingHFDataset(IterableDataset):
     """
     Streams images from Hugging Face Datasets.
     """
-    def __init__(self, dataset_name, split, preprocessor, auth_token=None):
+    def __init__(self, dataset_name, split, preprocessor, auth_token=None, limit=None):
         super(StreamingHFDataset, self).__init__()
         self.dataset_name = dataset_name
         self.split = split
         self.preprocessor = preprocessor
         self.auth_token = auth_token
+        self.limit = limit
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
+        count = 0
         
         # Load dataset in streaming mode
         ds = load_dataset(
@@ -44,7 +46,13 @@ class StreamingHFDataset(IterableDataset):
                         
                     data = self.preprocessor(image)
                     data['id'] = img_id
+                    data = self.preprocessor(image)
+                    data['id'] = img_id
                     yield data
+                    
+                    count += 1
+                    if self.limit is not None and count >= self.limit:
+                        return
                     
                 except Exception as e:
                     # print(f"Error processing HF sample: {e}")
