@@ -1,23 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-# from torch.cuda.amp import GradScaler, autocast # Deprecated
-import argparse
 import os
 from tqdm import tqdm
-from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 import kornia
 import numpy as np
-import sys
-import os
-
-# Add project root to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.models.unet import ColorizationUNet
 from src.data.factory import get_dataloader
-from configs.config import BATCH_SIZE, NUM_WORKERS, DEFAULT_TAR_PATH, MOVIENET_PATH
 
 def save_checkpoint(model, optimizer, epoch, loss, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -29,7 +20,7 @@ def save_checkpoint(model, optimizer, epoch, loss, path):
     }, path)
     print(f"💾 Checkpoint saved to {path}")
 
-def visualize_training_sample(l_input, ab_pred, ab_target, epoch, output_dir="training_viz"):
+def visualize_training_sample(l_input, ab_pred, ab_target, epoch, output_dir="outputs/training_viz"):
     """
     Saves a grid of Input | Prediction | Ground Truth for the first image in batch.
     """
@@ -101,7 +92,6 @@ def train(args):
     criterion = nn.L1Loss()
     
     # Mixed Precision (AMP)
-    # Use 'cuda' if available, else 'cpu' (though GradScaler mostly for CUDA)
     use_amp = args.device == 'cuda'
     scaler = torch.amp.GradScaler('cuda', enabled=use_amp)
     
@@ -141,36 +131,13 @@ def train(args):
             # Save Best Checkpoint
             if avg_loss < best_loss:
                 best_loss = avg_loss
-                save_checkpoint(model, optimizer, epoch, best_loss, "checkpoints/baseline_unet_best.pth")
+                save_checkpoint(model, optimizer, epoch, best_loss, "outputs/checkpoints/baseline_unet_best.pth")
             
             # Visualization
             visualize_training_sample(l_input, ab_pred, ab_target, epoch)
             
     except KeyboardInterrupt:
         print("\n🛑 Training interrupted by user.")
-        save_checkpoint(model, optimizer, epoch, running_loss, "checkpoints/interrupted.pth")
+        save_checkpoint(model, optimizer, epoch, running_loss, "outputs/checkpoints/interrupted.pth")
         
     print("✅ Training Complete.")
-
-if __name__ == "__main__":
-    load_dotenv()
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--source", type=str, default="local_movienet")
-    parser.add_argument("--tar_path", type=str, default=DEFAULT_TAR_PATH)
-    parser.add_argument("--limit", type=int, default=10000)
-    parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--batch_size", type=int, default=64) # Fallback to 32 if OOM
-    parser.add_argument("--num_workers", type=int, default=NUM_WORKERS)
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
-    args = parser.parse_args()
-    
-    args.hf_token = os.getenv("HF_AUTH_TOKEN")
-    
-    # Auto-detect tar
-    if args.source == 'local_movienet' and args.tar_path == DEFAULT_TAR_PATH:
-        if os.path.exists(MOVIENET_PATH):
-            tars = [f for f in os.listdir(MOVIENET_PATH) if f.endswith('.tar')]
-            if tars:
-                args.tar_path = os.path.join(MOVIENET_PATH, tars[0])
-                
-    train(args)

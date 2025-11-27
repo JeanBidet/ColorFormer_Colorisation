@@ -1,16 +1,63 @@
 import torch
-import argparse
 import os
+import matplotlib.pyplot as plt
+import kornia
+import numpy as np
 from tqdm import tqdm
 import pandas as pd
-from dotenv import load_dotenv
 
 from src.models.unet import ColorizationUNet
 from src.utils.metrics import ColorizationEvaluator
 from src.data.factory import get_dataloader
-from configs.config import BATCH_SIZE, NUM_WORKERS, DEFAULT_TAR_PATH, MOVIENET_PATH
+from configs.config import BATCH_SIZE, NUM_WORKERS
 
-def evaluate_baseline(source, tar_path=None, hf_token=None, device='cpu', num_batches=10):
+def visualize_evaluation(l_input, ab_pred, ab_target, batch_idx, output_dir="outputs/evaluation_viz"):
+    """
+    Saves a grid of Input | Prediction | Ground Truth for the first image in batch.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Take first image
+    l = l_input[0].detach().cpu()
+    pred = ab_pred[0].detach().cpu()
+    target = ab_target[0].detach().cpu()
+    
+    # Denormalize
+    l_denorm = (l + 1.0) * 50.0
+    pred_denorm = pred * 128.0
+    target_denorm = target * 128.0
+    
+    # Lab -> RGB
+    lab_pred = torch.cat([l_denorm, pred_denorm], dim=0)
+    lab_target = torch.cat([l_denorm, target_denorm], dim=0)
+    
+    rgb_pred = kornia.color.lab_to_rgb(lab_pred).permute(1, 2, 0).numpy()
+    rgb_target = kornia.color.lab_to_rgb(lab_target).permute(1, 2, 0).numpy()
+    l_img = l_denorm[0].numpy() / 100.0
+    
+    # Clip
+    rgb_pred = np.clip(rgb_pred, 0, 1)
+    rgb_target = np.clip(rgb_target, 0, 1)
+    
+    # Plot
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    axes[0].imshow(l_img, cmap='gray')
+    axes[0].set_title("Input (Gray)")
+    axes[0].axis('off')
+    
+    axes[1].imshow(rgb_pred)
+    axes[1].set_title("Prediction")
+    axes[1].axis('off')
+    
+    axes[2].imshow(rgb_target)
+    axes[2].set_title("Ground Truth")
+    axes[2].axis('off')
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, f"eval_batch_{batch_idx}.png"))
+    plt.close()
+
+def evaluate_baseline(source, tar_path=None, hf_token=None, device='cpu', num_batches=10, checkpoint=None):
     print(f"🚀 Starting Baseline Evaluation on {source}...")
     
     # 1. Setup Data
@@ -23,8 +70,20 @@ def evaluate_baseline(source, tar_path=None, hf_token=None, device='cpu', num_ba
         num_workers=NUM_WORKERS
     )
     
-    # 2. Setup Model (Untrained Baseline)
+    # 2. Setup Model
     model = ColorizationUNet().to(device)
+    
+    if checkpoint and os.path.exists(checkpoint):
+        print(f"📥 Loading checkpoint from {checkpoint}...")
+        checkpoint_data = torch.load(checkpoint, map_location=device)
+        # Handle both full checkpoint dict and direct state_dict
+        if 'model_state_dict' in checkpoint_data:
+            model.load_state_dict(checkpoint_data['model_state_dict'])
+        else:
+            model.load_state_dict(checkpoint_data)
+    else:
+        print("⚠️ No checkpoint found or provided. Using random weights (Untrained Baseline).")
+        
     model.eval()
     
     # 3. Setup Evaluator
@@ -53,6 +112,10 @@ def evaluate_baseline(source, tar_path=None, hf_token=None, device='cpu', num_ba
             # Grayscale Baseline (Predict 0 for ab)
             ab_zeros = torch.zeros_like(ab_pred)
             
+            # Visualize first batch
+            if i == 0:
+                visualize_evaluation(l_input, ab_pred, ab_target, i)
+            
             # Compute Metrics for Model
             batch_metrics = evaluator.evaluate_batch(l_input, ab_pred, ab_target)
             for k, v in batch_metrics.items():
@@ -61,10 +124,6 @@ def evaluate_baseline(source, tar_path=None, hf_token=None, device='cpu', num_ba
             # Compute Metrics for Grayscale Baseline
             gray_metrics = evaluator.evaluate_batch(l_input, ab_zeros, ab_target)
             for k, v in gray_metrics.items():
-                # Store with 'gray_' prefix or separate dict? 
-                # Let's use a separate dict key in results for simplicity if we want to average later.
-                # Or just print it?
-                # Let's append to a new list in results
                 if f"gray_{k}" not in results:
                     results[f"gray_{k}"] = []
                 results[f"gray_{k}"].append(v)
@@ -87,32 +146,3 @@ def evaluate_baseline(source, tar_path=None, hf_token=None, device='cpu', num_ba
     print(df.to_markdown(index=False))
     
     return avg_results
-
-if __name__ == "__main__":
-    load_dotenv()
-    
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--source", type=str, default="local_movienet", choices=['local_movienet', 'hf_imagenet', 'hf_places365'])
-    parser.add_argument("--tar_path", type=str, default=DEFAULT_TAR_PATH)
-    parser.add_argument("--num_batches", type=int, default=10)
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
-    args = parser.parse_args()
-    
-    # Auto-detect tar logic (copied from main.py)
-    current_tar = args.tar_path
-    if args.source == 'local_movienet':
-        if current_tar == DEFAULT_TAR_PATH:
-            if os.path.exists(MOVIENET_PATH):
-                tars = [f for f in os.listdir(MOVIENET_PATH) if f.endswith('.tar')]
-                if tars:
-                    current_tar = os.path.join(MOVIENET_PATH, tars[0])
-    
-    hf_token = os.getenv("HF_AUTH_TOKEN")
-    
-    evaluate_baseline(
-        source=args.source,
-        tar_path=current_tar,
-        hf_token=hf_token,
-        device=args.device,
-        num_batches=args.num_batches
-    )
