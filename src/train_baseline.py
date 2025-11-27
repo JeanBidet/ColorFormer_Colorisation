@@ -157,7 +157,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=str, default="local_movienet")
     parser.add_argument("--tar_path", type=str, default=DEFAULT_TAR_PATH)
-    parser.add_argument("--limit", type=int, default=20000)
+    parser.add_argument("--limit", type=int, default=100)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--batch_size", type=int, default=64) # Fallback to 32 if OOM
     parser.add_argument("--num_workers", type=int, default=NUM_WORKERS)
