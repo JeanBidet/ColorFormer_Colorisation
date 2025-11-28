@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Environments
+.env
+.env.local
+.venv/
+env/
+venv/
+
+# Data
+dataset/*
+*.tar
+*.zip
+
+
+# Models
+*.pth
+*.ckpt
+*.pt
+
+# Tests
+*test_vizualisation/*
