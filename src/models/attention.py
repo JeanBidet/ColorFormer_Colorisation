@@ -55,8 +55,9 @@ class WindowAttention(nn.Module):
         head_dim = dim // num_heads
         self.scale = head_dim ** -0.5
 
+        # Score = Q ⋅ K^T ​​+ B (Biais de Position)
+
         # Define a parameter table of relative position bias
-        # relation spatiale 2D entre deux pixels
         self.relative_position_bias_table = nn.Parameter(
             torch.zeros((2 * window_size[0] - 1) * (2 * window_size[1] - 1), num_heads)
         )  # 2*Wh-1 * 2*Ww-1, nH
@@ -106,13 +107,13 @@ class WindowAttention(nn.Module):
         qkv = self.qkv(x).reshape(B_, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple)
 
-        q = q * self.scale
-        attn = (q @ k.transpose(-2, -1))
+        q = q * self.scale # Normalisation of the query for gradient stability
+        attn = (q @ k.transpose(-2, -1)) # Matrix multiplication of the query and the key (Q ⋅ K^T)
 
         relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
-            self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)  # Wh*Ww,Wh*Ww,nH
-        relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
-        attn = attn + relative_position_bias.unsqueeze(0)
+            self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)  # Wh*Ww,Wh*Ww,nH Recuperation of the relative position bias
+        relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww Permutation of the relative position bias
+        attn = attn + relative_position_bias.unsqueeze(0) # Add the relative position bias to the attention matrix (Q ⋅ K^T + B) 
 
         if mask is not None:
             # mask: (nW, N, N)
@@ -220,7 +221,7 @@ class LWMHSA(nn.Module):
         x_windows = x_windows.view(-1, self.window_size * self.window_size, C)  # nW*B, window_size*window_size, C
 
         # 4. W-MSA/SW-MSA
-        attn_windows = self.attn(x_windows, mask=attn_mask)  # nW*B, window_size*window_size, C
+        attn_windows = self.attn(x_windows, mask=attn_mask)  # nW*B, window_size*window_size, C 
 
         # 5. Merge Windows
         attn_windows = attn_windows.view(-1, self.window_size, self.window_size, C)
