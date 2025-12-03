@@ -123,8 +123,8 @@ def visualize_shift_and_mask():
     plt.colorbar(im, ax=ax)
     
     plt.tight_layout()
-    output_path = "outputs/attention_shift_viz.png"
-    os.makedirs("outputs", exist_ok=True)
+    output_path = "outputs/tests_viz/attention_shift_viz.png"
+    os.makedirs("outputs/tests_viz", exist_ok=True)
     plt.savefig(output_path)
     print(f"✅ Visualization saved to {output_path}")
     plt.close()
